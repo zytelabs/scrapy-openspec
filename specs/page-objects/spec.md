@@ -20,6 +20,20 @@ uniqueness across modules and unambiguous fixture directory names.
 - **WHEN** page objects from two domains are imported in the same scope
 - **THEN** there are no name collisions (e.g. `ScanProductPage` vs `CclonlineProductPage`)
 
+### Requirement: Page objects use Returns[Item] to declare their item type — never to_item()
+Page objects SHALL declare their output item type by subclassing `Returns[<Item>]`
+from `web_poet`. Implementing a `to_item()` method is NOT permitted. scrapy-poet
+reads the `Returns` generic to determine what item to produce; `to_item()` is an
+older pattern that bypasses this mechanism.
+
+#### Scenario: Page object declares item type via Returns
+- **WHEN** a page object class is defined
+- **THEN** its class signature is `class ScanProductPage(WebPage, Returns[Product])` and no `to_item()` method exists
+
+#### Scenario: to_item() is not defined on any page object
+- **WHEN** the page object files are inspected
+- **THEN** no page object class defines a `to_item()` method
+
 ### Requirement: handle_urls takes a string pattern, not a list
 The argument to `@handle_urls` SHALL be a string (or multiple positional strings).
 Passing a list (e.g. `[]` or `["scan.co.uk"]`) is not valid and will not register
