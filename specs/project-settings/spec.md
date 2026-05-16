@@ -15,6 +15,11 @@ pre-emptively. The correct order is:
 2. If selectors fail, verify the content is absent in the raw HTML
 3. Only then switch the base class to `BrowserPage`
 
+There are exactly two permitted base classes: `WebPage` and `BrowserPage`. No other
+fetch strategies, custom HTTP clients, scripts, or workarounds SHALL be introduced
+to handle rendering or fetch failures. If neither `WebPage` nor `BrowserPage`
+produces working selectors, the problem is with the selectors, not the fetch strategy.
+
 `browserHtml` SHALL NOT be enabled via `settings.py`, `ZYTE_API_DEFAULT_PARAMS`,
 or per-request `meta` — it is controlled exclusively by the page object base class.
 
@@ -35,6 +40,10 @@ class ScanProductPage(BrowserPage, Returns[Product]):
 #### Scenario: BrowserPage is used only after HTTP selectors fail
 - **WHEN** selectors return no results
 - **THEN** the raw HTTP HTML is inspected first; `BrowserPage` is only adopted if the content is confirmed absent in HTTP
+
+#### Scenario: No third fetch strategy is introduced
+- **WHEN** neither WebPage nor BrowserPage selectors work
+- **THEN** the selectors are revised — no scripts, custom clients, or alternative fetch methods are created
 
 #### Scenario: browserHtml is not set directly in settings or meta
 - **WHEN** `settings.py` and spider `meta` are inspected
