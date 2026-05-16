@@ -34,23 +34,41 @@ older pattern that bypasses this mechanism.
 - **WHEN** the page object files are inspected
 - **THEN** no page object class defines a `to_item()` method
 
-### Requirement: handle_urls takes a string pattern, not a list
-The argument to `@handle_urls` SHALL be a string (or multiple positional strings).
-Passing a list (e.g. `[]` or `["scan.co.uk"]`) is not valid and will not register
-any URL pattern correctly.
+### Requirement: handle_urls takes a string that matches a partial URL — never a list
+The argument to `@handle_urls` SHALL be a plain string that partially matches the
+URLs the page object should handle. It MUST NOT be a list, an empty string, or a
+bare domain with no path context if a more specific pattern is known.
+
+The pattern should match the URL path prefix that uniquely identifies the page type
+for that domain. If the correct path is unknown, using just the domain (e.g.
+`"scan.co.uk"`) is acceptable as a starting point — but MUST be made more specific
+once the URL structure is understood, to avoid matching unintended pages.
+
+```python
+# Good — specific path prefix
+@handle_urls("scan.co.uk/products/")
+@handle_urls("scan.co.uk/shop/")
+
+# Acceptable when path is unknown
+@handle_urls("scan.co.uk")
+
+# Never acceptable
+@handle_urls("")          # empty string — causes registry conflicts
+@handle_urls([])          # list — not valid syntax
+@handle_urls(["scan.co.uk/products/"])  # list — not valid syntax
+```
+
+#### Scenario: handle_urls uses a domain-specific string pattern
+- **WHEN** a page object is defined
+- **THEN** its `@handle_urls` argument is a non-empty string containing the domain
+
+#### Scenario: Path prefix is used when URL structure is known
+- **WHEN** the URL structure of the target site is known
+- **THEN** the pattern includes the relevant path prefix (e.g. `"scan.co.uk/products/"`)
 
 #### Scenario: handle_urls passed a list does not register the pattern
 - **WHEN** `@handle_urls([])` or `@handle_urls(["scan.co.uk"])` is used
 - **THEN** the pattern is not registered and scrapy-poet does not inject the page object
-
-### Requirement: Page objects use real handle_urls patterns
-Every page object class SHALL be decorated with `@handle_urls` using a real,
-domain-specific URL pattern. Empty string patterns are NOT permitted as they
-cause registry conflicts when multiple domains are registered.
-
-#### Scenario: handle_urls has a domain-specific pattern
-- **WHEN** a page object is defined
-- **THEN** its `@handle_urls` pattern contains the domain and relevant path prefix
 
 #### Scenario: Empty handle_urls causes registry conflicts
 - **WHEN** two page objects use `@handle_urls("")`
