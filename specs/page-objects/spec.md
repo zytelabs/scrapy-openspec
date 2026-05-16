@@ -20,6 +20,27 @@ uniqueness across modules and unambiguous fixture directory names.
 - **WHEN** page objects from two domains are imported in the same scope
 - **THEN** there are no name collisions (e.g. `ScanProductPage` vs `CclonlineProductPage`)
 
+### Requirement: Page object fields use the @field decorator — never @property
+All data fields on a page object SHALL be decorated with `@field` from `web_poet`.
+Using `@property` is NOT permitted. scrapy-poet only recognises `@field` methods
+when calling `to_item()` internally via the `Returns` mechanism.
+
+```python
+# Correct
+@field
+def name(self) -> Optional[str]:
+    return self.css("h1::text").get()
+
+# Never acceptable
+@property
+def name(self) -> Optional[str]:
+    return self.css("h1::text").get()
+```
+
+#### Scenario: All data fields use @field
+- **WHEN** a page object is inspected
+- **THEN** every data attribute is decorated with `@field` and none use `@property`
+
 ### Requirement: Page objects use Returns[Item] to declare their item type — never to_item()
 Page objects SHALL declare their output item type by subclassing `Returns[<Item>]`
 from `web_poet`. Implementing a `to_item()` method is NOT permitted. scrapy-poet
