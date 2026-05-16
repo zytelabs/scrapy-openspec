@@ -3,6 +3,21 @@
 ## Purpose
 TBD - created by archiving change scrapy-multi-domain-scraper. Update Purpose after archive.
 ## Requirements
+### Requirement: HTTP fetch is always used — browserHtml is forbidden
+The project SHALL use plain HTTP fetching via scrapy-zyte-api. Browser rendering
+(`browserHtml`) SHALL NOT be enabled under any circumstances — not in `settings.py`,
+not in spider `meta`, and not in page object `additional_requests`. If a page appears
+to require JavaScript rendering, the correct response is to improve the CSS selectors
+against the HTTP response, not to switch fetch strategy.
+
+#### Scenario: browserHtml is not set in settings
+- **WHEN** `settings.py` is inspected
+- **THEN** `ZYTE_API_BROWSER_HTML`, `ZYTE_API_DEFAULT_PARAMS`, and any per-request `meta` do not contain `browserHtml`
+
+#### Scenario: Agent suspects JS rendering is needed
+- **WHEN** selectors return no results on an HTTP response
+- **THEN** the fix is to revise the selectors, not to enable `browserHtml`
+
 ### Requirement: Addons configure middleware and fingerprinting
 The project SHALL use Scrapy's `ADDONS` setting to configure `scrapy_poet` and
 `scrapy_zyte_api` rather than manually setting middlewares or fingerprinters.
