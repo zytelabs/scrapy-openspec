@@ -3,20 +3,42 @@
 ## Purpose
 TBD - created by archiving change scrapy-multi-domain-scraper. Update Purpose after archive.
 ## Requirements
-### Requirement: HTTP fetch is always used — browserHtml is forbidden
-The project SHALL use plain HTTP fetching via scrapy-zyte-api. Browser rendering
-(`browserHtml`) SHALL NOT be enabled under any circumstances — not in `settings.py`,
-not in spider `meta`, and not in page object `additional_requests`. If a page appears
-to require JavaScript rendering, the correct response is to improve the CSS selectors
-against the HTTP response, not to switch fetch strategy.
+### Requirement: Always try WebPage first — only use BrowserPage if selectors fail
+Page objects SHALL subclass `WebPage` (HTTP fetch) by default. `BrowserPage`
+(browser rendering via `browserHtml`) MAY be used only if selectors consistently
+return no results against the HTTP response and the content is confirmed to be
+JavaScript-rendered.
 
-#### Scenario: browserHtml is not set in settings
-- **WHEN** `settings.py` is inspected
-- **THEN** `ZYTE_API_BROWSER_HTML`, `ZYTE_API_DEFAULT_PARAMS`, and any per-request `meta` do not contain `browserHtml`
+The decision to switch from `WebPage` to `BrowserPage` MUST NOT be made
+pre-emptively. The correct order is:
+1. Implement selectors against the HTTP response (`WebPage`)
+2. If selectors fail, verify the content is absent in the raw HTML
+3. Only then switch the base class to `BrowserPage`
 
-#### Scenario: Agent suspects JS rendering is needed
-- **WHEN** selectors return no results on an HTTP response
-- **THEN** the fix is to revise the selectors, not to enable `browserHtml`
+`browserHtml` SHALL NOT be enabled via `settings.py`, `ZYTE_API_DEFAULT_PARAMS`,
+or per-request `meta` — it is controlled exclusively by the page object base class.
+
+```python
+# Default — always start here
+class ScanProductPage(WebPage, Returns[Product]):
+    ...
+
+# Only if HTTP response lacks the content
+class ScanProductPage(BrowserPage, Returns[Product]):
+    ...
+```
+
+#### Scenario: New page object starts as WebPage
+- **WHEN** a new page object is created
+- **THEN** it subclasses `WebPage`, not `BrowserPage`
+
+#### Scenario: BrowserPage is used only after HTTP selectors fail
+- **WHEN** selectors return no results
+- **THEN** the raw HTTP HTML is inspected first; `BrowserPage` is only adopted if the content is confirmed absent in HTTP
+
+#### Scenario: browserHtml is not set directly in settings or meta
+- **WHEN** `settings.py` and spider `meta` are inspected
+- **THEN** `ZYTE_API_BROWSER_HTML`, `ZYTE_API_DEFAULT_PARAMS`, and per-request `meta` do not contain `browserHtml`
 
 ### Requirement: Addons configure middleware and fingerprinting
 The project SHALL use Scrapy's `ADDONS` setting to configure `scrapy_poet` and
