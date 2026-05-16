@@ -3,6 +3,26 @@
 ## Purpose
 TBD - created by archiving change scrapy-multi-domain-scraper. Update Purpose after archive.
 ## Requirements
+### Requirement: scrapy savefixture is the only permitted way to save fixtures
+Fixtures SHALL be saved exclusively using the `scrapy savefixture` CLI command.
+Writing custom scripts, Python code, or any other mechanism to download and save
+fixture files is NOT permitted. `scrapy savefixture` boots the full Scrapy and
+scrapy-poet stack, ensuring the fixture is saved in exactly the format that
+`pytest-web-poet` expects.
+
+```bash
+# Correct
+scrapy savefixture specs.pages.scan_co_uk.ScanProductPage https://www.scan.co.uk/products/...
+
+# Never acceptable
+python scripts/save_fixture.py ...
+requests.get(url) + manual file writing
+```
+
+#### Scenario: Custom fixture script is not used
+- **WHEN** a fixture needs to be saved
+- **THEN** `scrapy savefixture` is run — no custom scripts or HTTP clients are used
+
 ### Requirement: Fixtures are saved with the correct page object class
 The Scrapy project MUST be fully initialised and the target page object class
 MUST exist as a stub before `scrapy savefixture` is run. `scrapy savefixture`
