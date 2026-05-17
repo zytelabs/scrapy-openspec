@@ -4,24 +4,32 @@
 TBD - created by archiving change scrapy-multi-domain-scraper. Update Purpose after archive.
 ## Requirements
 ### Requirement: scrapy savefixture is the only permitted way to save fixtures
-Fixtures SHALL be saved exclusively using the `scrapy savefixture` CLI command.
-Writing custom scripts, Python code, or any other mechanism to download and save
-fixture files is NOT permitted. `scrapy savefixture` boots the full Scrapy and
-scrapy-poet stack, ensuring the fixture is saved in exactly the format that
-`pytest-web-poet` expects.
+`scrapy savefixture` is the ONLY permitted method for saving fixtures. There are
+no exceptions. This is a hard rule.
+
+Do NOT:
+- Write a custom Python script to download and save fixture files
+- Use `requests`, `httpx`, `aiohttp`, or any HTTP client directly
+- Use `scrapy crawl` or any other Scrapy command as a substitute
+- Create any helper, wrapper, or workaround around `scrapy savefixture`
+- Attempt to construct the fixture directory structure manually
+
+If `scrapy savefixture` fails, the correct response is to fix the underlying
+problem (missing page object stub, misconfigured project, bad URL) — not to
+work around it with a custom script.
 
 ```bash
-# Correct
+# The only acceptable command
 scrapy savefixture specs.pages.scan_co_uk.ScanProductPage https://www.scan.co.uk/products/...
-
-# Never acceptable
-python scripts/save_fixture.py ...
-requests.get(url) + manual file writing
 ```
 
 #### Scenario: Custom fixture script is not used
 - **WHEN** a fixture needs to be saved
-- **THEN** `scrapy savefixture` is run — no custom scripts or HTTP clients are used
+- **THEN** `scrapy savefixture` is run and nothing else is attempted
+
+#### Scenario: savefixture fails
+- **WHEN** `scrapy savefixture` fails
+- **THEN** the root cause is diagnosed and fixed — no alternative method is tried
 
 ### Requirement: Fixtures are saved with the correct page object class
 The Scrapy project MUST be fully initialised and the target page object class
