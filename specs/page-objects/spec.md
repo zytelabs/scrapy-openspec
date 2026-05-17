@@ -57,21 +57,31 @@ older pattern that bypasses this mechanism.
 
 ### Requirement: handle_urls takes a string that matches a partial URL — never a list
 The argument to `@handle_urls` SHALL be a plain string that partially matches the
-URLs the page object should handle. It MUST NOT be a list, an empty string, or a
-bare domain with no path context if a more specific pattern is known.
+URLs the page object should handle. It MUST NOT be a list or an empty string.
 
-The pattern should match the URL path prefix that uniquely identifies the page type
-for that domain. If the correct path is unknown, using just the domain (e.g.
-`"scan.co.uk"`) is acceptable as a starting point — but MUST be made more specific
-once the URL structure is understood, to avoid matching unintended pages.
+Use the most specific pattern that reliably distinguishes the page type:
+
+1. **If list and detail URLs have an obvious path distinction** — use a path prefix
+   for each (e.g. `"scan.co.uk/shop/"` for list, `"scan.co.uk/products/"` for detail)
+2. **If no obvious distinction exists** — use a wildcard against the main domain
+   (e.g. `"scan.co.uk/*"`) for both page objects. It is acceptable for the list
+   and detail page objects to share the same `handle_urls` pattern. scrapy-poet
+   will select the correct one based on the `Returns[<Item>]` type.
 
 ```python
-# Good — specific path prefix
-@handle_urls("scan.co.uk/products/")
+# Best — distinct path prefixes when URL structure makes it obvious
 @handle_urls("scan.co.uk/shop/")
+class ScanProductListPage(WebPage, Returns[ProductList]): ...
 
-# Acceptable when path is unknown
-@handle_urls("scan.co.uk")
+@handle_urls("scan.co.uk/products/")
+class ScanProductPage(WebPage, Returns[Product]): ...
+
+# Also acceptable — wildcard when list/detail URLs cannot be distinguished
+@handle_urls("scan.co.uk/*")
+class ScanProductListPage(WebPage, Returns[ProductList]): ...
+
+@handle_urls("scan.co.uk/*")
+class ScanProductPage(WebPage, Returns[Product]): ...
 
 # Never acceptable
 @handle_urls("")          # empty string — causes registry conflicts
@@ -84,8 +94,12 @@ once the URL structure is understood, to avoid matching unintended pages.
 - **THEN** its `@handle_urls` argument is a non-empty string containing the domain
 
 #### Scenario: Path prefix is used when URL structure is known
-- **WHEN** the URL structure of the target site is known
-- **THEN** the pattern includes the relevant path prefix (e.g. `"scan.co.uk/products/"`)
+- **WHEN** list and detail URLs have an obvious path distinction
+- **THEN** each page object uses the relevant path prefix
+
+#### Scenario: Wildcard is used when list and detail URLs cannot be distinguished
+- **WHEN** no obvious URL pattern separates list from detail pages
+- **THEN** both page objects use a wildcard pattern such as `"domain.com/*"` and it is acceptable for both to be identical
 
 #### Scenario: handle_urls passed a list does not register the pattern
 - **WHEN** `@handle_urls([])` or `@handle_urls(["scan.co.uk"])` is used
