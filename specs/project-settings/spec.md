@@ -3,17 +3,21 @@
 ## Purpose
 TBD - created by archiving change scrapy-multi-domain-scraper. Update Purpose after archive.
 ## Requirements
-### Requirement: Always try WebPage first — only use BrowserPage if selectors fail
+### Requirement: Always try WebPage first — switch to BrowserPage if data is missing
 Page objects SHALL subclass `WebPage` (HTTP fetch) by default. `BrowserPage`
-(browser rendering via `browserHtml`) MAY be used only if selectors consistently
-return no results against the HTTP response and the content is confirmed to be
-JavaScript-rendered.
+(browser rendering via `browserHtml`) MAY be used if the HTTP response is missing
+content that should be present — either because selectors return no results at all,
+or because fields that are expected to have values consistently return `None` or
+incomplete data, indicating the content is JavaScript-rendered.
 
 The decision to switch from `WebPage` to `BrowserPage` MUST NOT be made
 pre-emptively. The correct order is:
 1. Implement selectors against the HTTP response (`WebPage`)
-2. If selectors fail, verify the content is absent in the raw HTML
+2. If any fields return `None` or incomplete values, verify the content is absent in the raw HTML
 3. Only then switch the base class to `BrowserPage`
+
+Partial data loss (e.g. pagination links missing, a subset of fields always `None`)
+is sufficient justification to switch — switching does not require all fields to fail.
 
 There are exactly two permitted base classes: `WebPage` and `BrowserPage`. No other
 fetch strategies, custom HTTP clients, scripts, or workarounds SHALL be introduced
@@ -28,7 +32,7 @@ or per-request `meta` — it is controlled exclusively by the page object base c
 class ScanProductPage(WebPage, Returns[Product]):
     ...
 
-# Only if HTTP response lacks the content
+# If HTTP response lacks content (all fields or partial — e.g. pagination missing)
 class ScanProductPage(BrowserPage, Returns[Product]):
     ...
 ```
@@ -37,9 +41,13 @@ class ScanProductPage(BrowserPage, Returns[Product]):
 - **WHEN** a new page object is created
 - **THEN** it subclasses `WebPage`, not `BrowserPage`
 
-#### Scenario: BrowserPage is used only after HTTP selectors fail
-- **WHEN** selectors return no results
+#### Scenario: BrowserPage is used when selectors return no results
+- **WHEN** selectors return no results at all
 - **THEN** the raw HTTP HTML is inspected first; `BrowserPage` is only adopted if the content is confirmed absent in HTTP
+
+#### Scenario: BrowserPage is used when expected fields are consistently missing
+- **WHEN** some fields (e.g. pagination links, prices, product lists) consistently return `None` despite the data being visible on the live page
+- **THEN** the raw HTTP HTML is inspected to confirm the content is absent; if confirmed, `BrowserPage` is adopted for that page object
 
 #### Scenario: No third fetch strategy is introduced
 - **WHEN** neither WebPage nor BrowserPage selectors work
@@ -48,6 +56,107 @@ class ScanProductPage(BrowserPage, Returns[Product]):
 #### Scenario: browserHtml is not set directly in settings or meta
 - **WHEN** `settings.py` and spider `meta` are inspected
 - **THEN** `ZYTE_API_BROWSER_HTML`, `ZYTE_API_DEFAULT_PARAMS`, and per-request `meta` do not contain `browserHtml`
+
+### Requirement: Check for known platform APIs before building HTML page objects
+Before implementing HTML selectors for a new domain's listing page, the developer
+SHALL probe the site for known e-commerce platform APIs. If a platform API is
+detected, it SHALL be used as the start URL and data source for the listing page
+object instead of the HTML collection page. The listing page object then parses
+JSON via `json.loads(self.response.body)` rather than CSS/XPath selectors.
+
+#### Platform: Shopify
+**Detection**: request `{domain}/products.json?limit=1`. A 200 response with a
+`{"products": [...]}` body confirms Shopify.
+
+**Start URL**: `{domain}/products.json?limit=250`
+
+**Pagination**: `since_id` — if the response contains exactly 250 items, set
+`next_page_url` to `{domain}/products.json?limit=250&since_id={last_item_id}`.
+Continue until a page returns fewer than 250 items.
+
+**Product URLs**: construct from the `handle` field — `{base}/products/{handle}`.
+
+**`handle_urls` pattern**: match the API path, e.g. `example.myshopify.com/products.json`
+or `www.example.com/products.json`.
+
+```python
+@handle_urls("example.com/products.json")
+class ExampleProductListPage(WebPage, Returns[ProductList]):
+    @field
+    def product_urls(self) -> Optional[list]:
+        data = json.loads(self.response.body)
+        parsed = urlparse(str(self.response.url))
+        base = f"{parsed.scheme}://{parsed.netloc}"
+        return [f"{base}/products/{p['handle']}" for p in data.get("products", [])] or None
+
+    @field
+    def next_page_url(self) -> Optional[str]:
+        data = json.loads(self.response.body)
+        products = data.get("products", [])
+        if len(products) == 250:
+            parsed = urlparse(str(self.response.url))
+            base = f"{parsed.scheme}://{parsed.netloc}"
+            return f"{base}/products.json?limit=250&since_id={products[-1]['id']}"
+        return None
+```
+
+#### Platform: Ecwid
+**Detection**: look for `ecwidStoreID` in the page HTML. The store ID and public
+token (`public_…`) are embedded in the page's JavaScript configuration.
+
+**Store ID**: extract from `ecwidStoreID = "..."` or from CDN image URLs
+(`d2j6dbq0eux0bg.cloudfront.net/images/{storeId}/...`).
+
+**Public token**: search the HTML for `"public_[A-Za-z0-9]+"`. Use the first
+match that is not scoped to a named app — or the one under `appsPublicTokens`
+if no general token exists.
+
+**Category ID**: visible in the rendered HTML as a class on the product browser
+element, e.g. `ecwid-productBrowser-CategoryPage-{categoryId}`.
+
+**Start URL**: `https://app.ecwid.com/api/v3/{storeId}/products?categoryId={categoryId}&enabled=true&limit=100&token={publicToken}`
+
+**Pagination**: offset-based — if `offset + count < total`, increment `offset`
+by `limit` and request the same URL with the new `offset`.
+
+**`handle_urls` pattern**: match the Ecwid API path, e.g.
+`app.ecwid.com/api/v3/{storeId}/products`. Add `app.ecwid.com` to
+`allowed_domains`.
+
+```python
+@handle_urls("app.ecwid.com/api/v3/32430141/products")
+class ExampleProductListPage(WebPage, Returns[ProductList]):
+    @field
+    def product_urls(self) -> Optional[list]:
+        data = json.loads(self.response.body)
+        return [item["url"] for item in data.get("items", []) if item.get("url")] or None
+
+    @field
+    def next_page_url(self) -> Optional[str]:
+        data = json.loads(self.response.body)
+        offset, count, total, limit = (
+            data.get("offset", 0), data.get("count", 0),
+            data.get("total", 0), data.get("limit", 100),
+        )
+        if offset + count < total:
+            parsed = urlparse(str(self.response.url))
+            params = parse_qs(parsed.query, keep_blank_values=True)
+            params["offset"] = [str(offset + limit)]
+            return urlunparse(parsed._replace(query=urlencode({k: v[0] for k, v in params.items()})))
+        return None
+```
+
+#### Scenario: Shopify site uses products.json instead of collection HTML
+- **WHEN** a new domain is confirmed to be a Shopify store
+- **THEN** the spider start URL is `{domain}/products.json?limit=250` and the listing page object parses JSON — no CSS selectors are written for the listing page
+
+#### Scenario: Ecwid site uses the REST API instead of the storefront HTML
+- **WHEN** a new domain embeds `ecwidStoreID` in its HTML
+- **THEN** the store ID, category ID, and public token are extracted from the HTML and the spider start URL is the Ecwid REST API endpoint
+
+#### Scenario: Unknown platform falls back to HTML scraping
+- **WHEN** no known platform API is detected
+- **THEN** proceed with the standard WebPage HTML approach, switching to BrowserPage if data is missing
 
 ### Requirement: Addons configure middleware and fingerprinting
 The project SHALL use Scrapy's `ADDONS` setting to configure `scrapy_poet` and
