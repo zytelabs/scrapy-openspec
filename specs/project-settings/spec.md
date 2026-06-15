@@ -70,8 +70,9 @@ JSON via `json.loads(self.response.body)` rather than CSS/XPath selectors.
 
 **Start URL**: `{domain}/products.json?limit=250`
 
-**Pagination**: `since_id` — if the response contains exactly 250 items, set
-`next_page_url` to `{domain}/products.json?limit=250&since_id={last_item_id}`.
+**Pagination**: `page=N` — if the response contains exactly 250 items, increment
+the `page` parameter by 1. Do NOT use `since_id`: Shopify stores sort products by
+"featured" order (not by ID), so `since_id` repeats the same products on every page.
 Continue until a page returns fewer than 250 items.
 
 **Product URLs**: construct from the `handle` field — `{base}/products/{handle}`.
@@ -93,11 +94,12 @@ class ExampleProductListPage(WebPage, Returns[ProductList]):
     def next_page_url(self) -> Optional[str]:
         data = json.loads(self.response.body)
         products = data.get("products", [])
-        if len(products) == 250:
-            parsed = urlparse(str(self.response.url))
-            base = f"{parsed.scheme}://{parsed.netloc}"
-            return f"{base}/products.json?limit=250&since_id={products[-1]['id']}"
-        return None
+        if len(products) < 250:
+            return None
+        parsed = urlparse(str(self.response.url))
+        params = parse_qs(parsed.query, keep_blank_values=True)
+        params["page"] = [str(int(params.get("page", ["1"])[0]) + 1)]
+        return urlunparse(parsed._replace(query=urlencode({k: v[0] for k, v in params.items()})))
 ```
 
 #### Platform: Ecwid
