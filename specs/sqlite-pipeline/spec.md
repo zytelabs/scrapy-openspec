@@ -20,6 +20,17 @@ defaulting to `"output.db"` if not set. It SHALL be instantiated via
 - **WHEN** `SQLITE_DB_PATH = "custom.db"` is set
 - **THEN** the pipeline writes to `custom.db`
 
+### Requirement: Schema covers all standard Product fields
+The `products` table SHALL include a column for every field on the `Product`
+item. The `url` column SHALL be declared `TEXT UNIQUE` (not `PRIMARY KEY`) so
+an auto-increment integer primary key can be used alongside it. Text fields are
+stored as `TEXT`; list fields (`images`, `breadcrumbs`) are stored as JSON
+strings.
+
+#### Scenario: Table includes currency_raw column
+- **WHEN** the `products` table is inspected
+- **THEN** a `currency_raw TEXT` column is present alongside `currency TEXT`
+
 ### Requirement: List fields are serialised as JSON
 The `images` and `breadcrumbs` fields on `Product`, being lists, SHALL be
 serialised to JSON strings before being written to SQLite.

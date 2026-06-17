@@ -160,6 +160,34 @@ class ExampleProductListPage(WebPage, Returns[ProductList]):
 - **WHEN** no known platform API is detected
 - **THEN** proceed with the standard WebPage HTML approach, switching to BrowserPage if data is missing
 
+### Requirement: Concurrency is scaled by domain count
+`CONCURRENT_REQUESTS_PER_DOMAIN` SHALL be set to `32`. `CONCURRENT_REQUESTS`
+SHALL be set to `32 × <number of domains>` so total throughput scales linearly
+as new domains are added. The formula SHOULD be noted in a comment.
+
+AutoThrottle SHALL be enabled with the following values:
+
+```python
+CONCURRENT_REQUESTS_PER_DOMAIN = 32
+CONCURRENT_REQUESTS = 32 * <num_domains>   # updated whenever a domain is added or removed
+
+AUTOTHROTTLE_ENABLED = True
+AUTOTHROTTLE_START_DELAY = 0.25
+AUTOTHROTTLE_MAX_DELAY = 30
+AUTOTHROTTLE_TARGET_CONCURRENCY = 32.0
+```
+
+`DOWNLOAD_DELAY` SHALL be `0` — AutoThrottle manages pacing; a static delay is
+not needed.
+
+#### Scenario: CONCURRENT_REQUESTS reflects domain count
+- **WHEN** 5 domains are configured
+- **THEN** `CONCURRENT_REQUESTS` is `160` (32 × 5)
+
+#### Scenario: AutoThrottle is always enabled
+- **WHEN** `settings.py` is loaded
+- **THEN** `AUTOTHROTTLE_ENABLED = True` is present
+
 ### Requirement: Addons configure middleware and fingerprinting
 The project SHALL use Scrapy's `ADDONS` setting to configure `scrapy_poet` and
 `scrapy_zyte_api` rather than manually setting middlewares or fingerprinters.

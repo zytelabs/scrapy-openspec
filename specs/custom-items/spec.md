@@ -22,9 +22,34 @@ The `Product` item SHALL define fields covering the standard data points
 extractable from a product detail page. The `url` field is required; all
 others are `Optional`.
 
+The standard set of fields is:
+
+| Field | Type | Notes |
+|---|---|---|
+| `url` | `str` | Required — the canonical product URL |
+| `name` | `Optional[str]` | Product title |
+| `price` | `Optional[str]` | Current selling price as a decimal string |
+| `regular_price` | `Optional[str]` | Pre-discount price as a decimal string |
+| `currency` | `Optional[str]` | Normalised currency code (e.g. `"GBP"`) |
+| `currency_raw` | `Optional[str]` | Raw currency symbol as it appears on the page (e.g. `"£"`) |
+| `sku` | `Optional[str]` | Manufacturer or retailer SKU / MPN |
+| `brand` | `Optional[str]` | Brand or manufacturer name |
+| `description` | `Optional[str]` | Plain-text product description |
+| `availability` | `Optional[str]` | Stock status (e.g. `"InStock"`, `"OutOfStock"`) |
+| `breadcrumbs` | `Optional[List[str]]` | Category path from the page breadcrumb trail |
+| `images` | `Optional[List[str]]` | Product image URLs |
+
+`currency` and `currency_raw` are complementary: `currency` is the normalised ISO
+code derived from the raw symbol; `currency_raw` preserves the symbol exactly as
+scraped so downstream consumers can audit the source.
+
 #### Scenario: Product has required and optional fields
 - **WHEN** `Product(url="https://example.com")` is instantiated
 - **THEN** the instance is created successfully with all optional fields defaulting to `None`
+
+#### Scenario: currency and currency_raw are both present
+- **WHEN** a price such as `"£12.99"` is scraped
+- **THEN** `currency_raw` is `"£"` and `currency` is `"GBP"`
 
 ### Requirement: ProductList item is a crawl-control item
 The `ProductList` item SHALL represent a listing page used to harvest URLs
