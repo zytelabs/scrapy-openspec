@@ -3,6 +3,29 @@
 ## Purpose
 TBD - created by archiving change scrapy-multi-domain-scraper. Update Purpose after archive.
 ## Requirements
+### Requirement: All page HTML is obtained through the Scrapy project
+The agent SHALL NOT fetch page content directly using MCP tools, HTTP libraries,
+external API calls, or any other mechanism outside the Scrapy project. If the HTML
+of a page is needed — for selector development, page inspection, or any other purpose
+— a fixture MUST be saved first using `scrapy savefixture`. The fixture HTML is the
+only permitted source of page content during development.
+
+Do NOT:
+- Call `mcp__zyte__fetch_http`, `mcp__zyte__render_page`, or any Zyte API MCP tool to retrieve page HTML
+- Use `requests`, `httpx`, `aiohttp`, or any HTTP library directly to fetch a page
+- Use browser automation or screenshot tools to inspect page structure
+- Fetch a page outside the Scrapy project for any reason, including "just to check" the structure
+
+If you need to inspect a page's HTML, save the fixture first, then read the fixture files.
+
+#### Scenario: Agent needs to inspect page HTML
+- **WHEN** the agent needs to see the HTML of a page
+- **THEN** `scrapy savefixture` is run first and the resulting `HttpResponse-body-clean.html` is read
+
+#### Scenario: Direct fetch is not used as a shortcut
+- **WHEN** a fixture has not yet been saved
+- **THEN** the agent does not fetch the page directly — it saves the fixture instead
+
 ### Requirement: scrapy savefixture is the only permitted way to save fixtures
 `scrapy savefixture` is the ONLY permitted method for saving fixtures. There are
 no exceptions. This is a hard rule.
