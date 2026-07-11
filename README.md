@@ -23,6 +23,7 @@ openspec/
     custom-items/
     fixture-testing/
     project-settings/
+    scrapy-playwright/
     sqlite-pipeline/
   changes/            # Change log and archive
 ```
@@ -36,4 +37,5 @@ openspec/
 | `custom-items` | Plain `attrs` items, field definitions for `Product` and `ProductList` |
 | `fixture-testing` | `scrapy savefixture` workflow, `output.json` accuracy, subagent parallelism |
 | `project-settings` | `ADDONS` order, `SCRAPY_POET_DISCOVER`, pytest config, project creation flow |
+| `scrapy-playwright` | Browser rendering without Zyte API: stock handler, per-request middleware, patchright/camoufox providers, camoufox `no_viewport`/`domcontentloaded` gotchas |
 | `sqlite-pipeline` | Item filtering, configurable DB path, JSON serialisation of list fields |
