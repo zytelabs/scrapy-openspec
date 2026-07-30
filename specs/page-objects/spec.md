@@ -3,6 +3,18 @@
 ## Purpose
 TBD - created by archiving change scrapy-multi-domain-scraper. Update Purpose after archive.
 ## Requirements
+### Requirement: Page-object primitives are imported from web-poet
+`WebPage`, `BrowserPage`, `Returns`, `field`, and `handle_urls` SHALL be imported
+from `web_poet`. They are not public exports of `scrapy_poet`.
+
+```python
+from web_poet import Returns, WebPage, field, handle_urls
+```
+
+#### Scenario: A page object can be imported by savefixture
+- **WHEN** `scrapy savefixture` imports a page object module
+- **THEN** its `web_poet` imports resolve without an `ImportError`
+
 ### Requirement: Page objects are grouped by domain in a single file
 All page objects for a given domain SHALL live in a single file named after
 that domain (e.g. `<projectname>/pages/scan_co_uk.py`). Separate files per item type

@@ -194,6 +194,20 @@ The project SHALL use Scrapy's `ADDONS` setting to configure `scrapy_poet` and
 `scrapy_poet.Addon` MUST be listed before `scrapy_zyte_api.Addon` so that
 zyte-api can detect and wrap the poet fingerprinter.
 
+The project dependency MUST enable scrapy-zyte-api's `provider` extra:
+
+```toml
+[project]
+dependencies = [
+    "scrapy-poet>=0.27.2",
+    "scrapy-zyte-api[provider]>=0.35.0",
+]
+```
+
+The extra installs the `ZyteApiProvider` and its runtime dependencies. It is
+required when `scrapy_zyte_api.Addon` is configured, even if project items are
+fully custom and do not inherit from `zyte_common_items`.
+
 #### Scenario: Addons registered in correct order
 - **WHEN** `settings.py` is loaded
 - **THEN** `ADDONS` contains `scrapy_poet.Addon` at priority 300 and `scrapy_zyte_api.Addon` at priority 500
@@ -201,6 +215,10 @@ zyte-api can detect and wrap the poet fingerprinter.
 #### Scenario: No manual middleware configuration
 - **WHEN** reviewing `settings.py`
 - **THEN** `DOWNLOADER_MIDDLEWARES`, `SPIDER_MIDDLEWARES`, and `REQUEST_FINGERPRINTER_CLASS` are NOT set manually
+
+#### Scenario: Zyte API provider dependencies are installed
+- **WHEN** the project enables `scrapy_zyte_api.Addon`
+- **THEN** its dependency is declared as `scrapy-zyte-api[provider]` and the addon can load `ZyteApiProvider` without an import error
 
 ### Requirement: Project source files live inside the project folder
 After running `scrapy startproject <name> .`, all source files SHALL be placed

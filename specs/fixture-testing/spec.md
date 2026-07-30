@@ -3,6 +3,19 @@
 ## Purpose
 TBD - created by archiving change scrapy-multi-domain-scraper. Update Purpose after archive.
 ## Requirements
+### Requirement: Fixture destination is configured under tests
+`scrapy-poet` defaults `scrapy savefixture` output to a root-level `fixtures/`
+directory. Projects SHALL override that default before saving any fixture:
+
+```python
+# <projectname>/settings.py
+SCRAPY_POET_TESTS_DIR = "tests/fixtures"
+```
+
+#### Scenario: savefixture writes below tests/fixtures
+- **WHEN** `scrapy savefixture` is run with `SCRAPY_POET_TESTS_DIR` configured
+- **THEN** it creates `tests/fixtures/<fully-qualified-page-object>/test-N/`, not `fixtures/` at the project root
+
 ### Requirement: All page HTML is obtained through the Scrapy project
 The agent SHALL NOT fetch page content directly using MCP tools, HTTP libraries,
 external API calls, or any other mechanism outside the Scrapy project. If the HTML
@@ -20,7 +33,7 @@ If you need to inspect a page's HTML, save the fixture first, then read the fixt
 
 #### Scenario: Agent needs to inspect page HTML
 - **WHEN** the agent needs to see the HTML of a page
-- **THEN** `scrapy savefixture` is run first and the resulting `HttpResponse-body-clean.html` is read
+- **THEN** `scrapy savefixture` is run first and the resulting `inputs/HttpResponse-body-clean.html` is read
 
 #### Scenario: Direct fetch is not used as a shortcut
 - **WHEN** a fixture has not yet been saved
@@ -70,15 +83,26 @@ SHALL NOT be saved under a different domain's page object class name.
 - **WHEN** `scrapy savefixture <projectname>.pages.cclonline_com.CclonlineProductPage <url>` is run
 - **THEN** the fixture is saved to `tests/fixtures/<projectname>.pages.cclonline_com.CclonlineProductPage/test-N/`
 
-### Requirement: Fixtures are cleaned before selector development
-After saving a fixture, the `scripts/clean_fixture.py` helper SHALL be run to
-produce two additional files:
-- `HttpResponse-body-clean.html` — noise-free HTML for selector development
-- `HttpResponse-body.txt` — plain text for populating `output.json`
+### Requirement: Fixtures are cleaned with clear-html before selector development
+After saving a fixture, the `scripts/clean_fixture.py` helper SHALL process the
+saved response with the `clear-html` package. The project SHALL declare
+`clear-html` as a direct dependency. The helper SHALL use `clean_node`,
+`cleaned_node_to_html`, and `cleaned_node_to_text`; it SHALL NOT implement a
+separate hand-written HTML cleaner or text extractor.
 
-#### Scenario: Cleaner reduces HTML size significantly
+`scrapy savefixture` stores the response input at
+`test-N/inputs/HttpResponse-body.html`. The helper SHALL read that file and
+write its two additional files alongside it:
+- `inputs/HttpResponse-body-clean.html` — normalized HTML for selector development
+- `inputs/HttpResponse-body.txt` — plain text for populating `output.json`
+
+The helper operates solely on the saved fixture and MUST NOT fetch a page.
+It SHOULD parse the source as UTF-8 text to avoid lxml's Latin-1 fallback when
+an HTML document lacks an explicit charset declaration.
+
+#### Scenario: Cleaner uses clear-html on the saved response input
 - **WHEN** `clean_fixture.py` is run on a fixture
-- **THEN** the clean HTML is smaller than the original and the plain text is at least 80% smaller
+- **THEN** `inputs/HttpResponse-body-clean.html` and `inputs/HttpResponse-body.txt` are created from `inputs/HttpResponse-body.html` without fetching a URL
 
 ### Requirement: output.json matches selector output exactly
 The `output.json` expected values SHALL match exactly what the implemented
@@ -102,8 +126,8 @@ Steps 7 (populate `output.json`) and 8 (implement selectors) SHALL be delegated
 to subagents rather than performed by the main agent. Each subagent is responsible
 for a single page object and SHALL:
 
-1. Read `HttpResponse-body.txt` to extract expected field values and write `output.json`
-2. Read `HttpResponse-body-clean.html` to develop CSS/XPath selectors for each field
+1. Read `inputs/HttpResponse-body.txt` to extract expected field values and write `output.json`
+2. Read `inputs/HttpResponse-body-clean.html` to develop CSS/XPath selectors for each field
 3. Update the page object with the implemented selectors
 4. Run `pytest` for that fixture and confirm all tests pass
 

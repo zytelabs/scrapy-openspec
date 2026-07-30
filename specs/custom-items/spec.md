@@ -4,9 +4,12 @@
 TBD - created by archiving change scrapy-multi-domain-scraper. Update Purpose after archive.
 ## Requirements
 ### Requirement: Items are plain attrs dataclasses
-Custom items SHALL be defined using `@attrs.define` with no dependency on
-`zyte_common_items`. Before creating items, the developer MUST confirm whether
-to extend `zyte_common_items` or create fully custom classes, as this affects
+Custom items SHALL be defined using `@attrs.define` and SHALL NOT import or
+inherit from `zyte_common_items`. The project MAY install `zyte_common_items`
+transitively through `scrapy-zyte-api[provider]`; that runtime dependency does
+not change the custom item model. Before creating items, the developer MUST
+confirm whether to extend `zyte_common_items` or create fully custom classes,
+as this affects
 item structure, page object inheritance, and pipeline design.
 
 #### Scenario: Product item is a plain attrs class
