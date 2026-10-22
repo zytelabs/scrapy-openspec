@@ -56,7 +56,7 @@ work around it with a custom script.
 
 ```bash
 # The only acceptable command
-scrapy savefixture specs.pages.scan_co_uk.ScanProductPage https://www.scan.co.uk/products/...
+scrapy savefixture base.pages.scan_co_uk.ScanProductPage https://www.scan.co.uk/products/...
 ```
 
 #### Scenario: Custom fixture script is not used
@@ -84,21 +84,48 @@ SHALL NOT be saved under a different domain's page object class name.
 - **THEN** the fixture is saved to `tests/fixtures/<projectname>.pages.cclonline_com.CclonlineProductPage/test-N/`
 
 ### Requirement: Fixtures are cleaned with clear-html before selector development
-After saving a fixture, the `scripts/clean_fixture.py` helper SHALL process the
-saved response with the `clear-html` package. The project SHALL declare
-`clear-html` as a direct dependency. The helper SHALL use `clean_node`,
-`cleaned_node_to_html`, and `cleaned_node_to_text`; it SHALL NOT implement a
-separate hand-written HTML cleaner or text extractor.
+After saving a fixture, run the cleaning helper on it:
 
-`scrapy savefixture` stores the response input at
-`test-N/inputs/HttpResponse-body.html`. The helper SHALL read that file and
-write its two additional files alongside it:
-- `inputs/HttpResponse-body-clean.html` — normalized HTML for selector development
-- `inputs/HttpResponse-body.txt` — plain text for populating `output.json`
+```bash
+python scripts/clean_fixture.py tests/fixtures/<fully-qualified-page-object>/test-N
+```
 
-The helper operates solely on the saved fixture and MUST NOT fetch a page.
-It SHOULD parse the source as UTF-8 text to avoid lxml's Latin-1 fallback when
-an HTML document lacks an explicit charset declaration.
+The helper ships with this spec at `openspec/scripts/clean_fixture.py` and SHALL
+be copied into the project's `scripts/` directory when the project is created.
+It SHALL NOT be rewritten, replaced, or reimplemented per project. The project
+SHALL declare `clear-html` as a direct dependency.
+
+The helper processes the saved response with `clear-html` (`clean_node`,
+`cleaned_node_to_html`, `cleaned_node_to_text`). `scrapy savefixture` stores the
+response input as `test-N/inputs/HttpResponse-body.html` for `WebPage` page
+objects and `test-N/inputs/BrowserResponse-body.html` for `BrowserPage` page
+objects. The helper writes two files alongside it with the same prefix:
+- `inputs/<Response>-body-clean.html` — readable HTML for understanding the page's content and structure
+- `inputs/<Response>-body.txt` — plain text for populating `output.json`
+
+The clean HTML is for reading only. clear-html drops `class` and `id`
+attributes, renames tags (e.g. `<h1>` becomes `<h2>`), and removes or flattens
+wrappers such as `<nav>` and `<div>`, so selectors written against it do not
+match the response the page object actually receives.
+
+JSON bodies, such as a Shopify `products.json` fixture, are skipped; read
+`inputs/HttpResponse-body.html` directly for those.
+
+The helper operates solely on the saved fixture and never fetches a page. It
+decodes the source as UTF-8 to avoid lxml's Latin-1 fallback when an HTML
+document lacks an explicit charset declaration.
+
+#### Scenario: Clean HTML is not used for selectors
+- **WHEN** a selector is being written for a field
+- **THEN** it is developed and checked against the raw `inputs/<Response>-body.html`, not `-clean.html`
+
+#### Scenario: Helper is copied, not rewritten
+- **WHEN** a new project is created
+- **THEN** `scripts/clean_fixture.py` is a copy of `openspec/scripts/clean_fixture.py`
+
+#### Scenario: BrowserPage fixture is cleaned
+- **WHEN** `clean_fixture.py` is run on a fixture saved for a `BrowserPage` page object
+- **THEN** `inputs/BrowserResponse-body-clean.html` and `inputs/BrowserResponse-body.txt` are created
 
 #### Scenario: Cleaner uses clear-html on the saved response input
 - **WHEN** `clean_fixture.py` is run on a fixture
@@ -122,12 +149,12 @@ When a page object is renamed, the fixture directory MUST be renamed to match.
 - **THEN** the fixture directory is renamed from `...ProductPage` to `...ScanProductPage`
 
 ### Requirement: Subagents populate output.json and implement selectors
-Steps 7 (populate `output.json`) and 8 (implement selectors) SHALL be delegated
-to subagents rather than performed by the main agent. Each subagent is responsible
+Step 7 of the creation flow (populate `output.json` and implement selectors)
+SHALL be delegated to subagents rather than performed by the main agent. Each subagent is responsible
 for a single page object and SHALL:
 
-1. Read `inputs/HttpResponse-body.txt` to extract expected field values and write `output.json`
-2. Read `inputs/HttpResponse-body-clean.html` to develop CSS/XPath selectors for each field
+1. Read `inputs/HttpResponse-body.txt` (`BrowserResponse-body.txt` for a `BrowserPage`) to extract expected field values and write `output.json`
+2. Use `inputs/HttpResponse-body-clean.html` (`BrowserResponse-body-clean.html` for a `BrowserPage`) to locate each field's content, then develop CSS/XPath selectors against the raw `inputs/HttpResponse-body.html` (`BrowserResponse-body.html`), which is what the page object receives in tests
 3. Update the page object with the implemented selectors
 4. Run `pytest` for that fixture and confirm all tests pass
 

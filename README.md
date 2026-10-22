@@ -17,6 +17,7 @@ git clone https://github.com/zytelabs/scrapy-openspec.git openspec
 
 ```
 openspec/
+  scripts/            # Helpers copied into new projects (clean_fixture.py)
   specs/              # One subdirectory per feature, each with a spec.md
     spider/
     page-objects/
@@ -38,4 +39,4 @@ openspec/
 | `fixture-testing` | `scrapy savefixture` workflow, configured test fixture location, clear-html cleaning, `output.json` accuracy, subagent parallelism |
 | `project-settings` | `ADDONS` order, `SCRAPY_POET_DISCOVER`, pytest config, project creation flow |
 | `scrapy-playwright` | Browser rendering without Zyte API: stock handler, per-request middleware, patchright/camoufox providers, camoufox `no_viewport`/`domcontentloaded` gotchas |
-| `sqlite-pipeline` | Item filtering, configurable DB path, JSON serialisation of list fields |
+| `sqlite-pipeline` | Optional, opt-in only: item filtering, configurable DB path, JSON serialisation of list fields |
