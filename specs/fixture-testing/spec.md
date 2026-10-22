@@ -108,8 +108,10 @@ attributes, renames tags (e.g. `<h1>` becomes `<h2>`), and removes or flattens
 wrappers such as `<nav>` and `<div>`, so selectors written against it do not
 match the response the page object actually receives.
 
-JSON bodies, such as a Shopify `products.json` fixture, are skipped; read
-`inputs/HttpResponse-body.html` directly for those.
+JSON bodies, such as a Shopify `products.json` fixture, and XML documents, such
+as a sitemap used as a listing page, are skipped; read `inputs/HttpResponse-body.html`
+directly for those. An XML declaration at the top of an XHTML page is stripped
+before cleaning.
 
 The helper operates solely on the saved fixture and never fetches a page. It
 decodes the source as UTF-8 to avoid lxml's Latin-1 fallback when an HTML

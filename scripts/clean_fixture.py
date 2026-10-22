@@ -10,16 +10,21 @@ BrowserResponse for BrowserPage) and writes alongside it:
   renames tags. Selectors target the raw <Response>-body.html.
 - <Response>-body.txt: plain text for populating output.json
 
-JSON bodies (e.g. Shopify products.json) are skipped: read them directly.
+JSON bodies (e.g. Shopify products.json) and XML documents such as sitemaps
+are skipped: read them directly.
 This script never fetches a page; it only reads files savefixture wrote.
 """
 
 import json
+import re
 import sys
 from pathlib import Path
 
 from clear_html import clean_node, cleaned_node_to_html, cleaned_node_to_text
 from lxml.html import document_fromstring
+
+XML_DECLARATION = re.compile(r"^\s*<\?xml[^>]*\?>", re.IGNORECASE)
+XML_ROOTS = ("<urlset", "<sitemapindex", "<rss", "<feed")
 
 
 def clean_fixture(fixture_dir: Path) -> None:
@@ -37,6 +42,12 @@ def clean_fixture(fixture_dir: Path) -> None:
         text = body.read_bytes().decode("utf-8", errors="replace")
         if text.lstrip().startswith(("{", "[")):
             print(f"{body}: JSON body, skipped (read it directly)")
+            continue
+        # lxml rejects str input that carries an encoding declaration, and
+        # XHTML pages sometimes start with one, so drop it before parsing.
+        text = XML_DECLARATION.sub("", text, count=1)
+        if text.lstrip().lower().startswith(XML_ROOTS):
+            print(f"{body}: XML document (e.g. sitemap), skipped (read it directly)")
             continue
 
         url = None

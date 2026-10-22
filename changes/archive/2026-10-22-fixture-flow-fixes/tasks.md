@@ -8,6 +8,6 @@
 ## 2. Cleaning Helper
 
 - [x] 2.1 Add `scripts/clean_fixture.py` using clear-html
-- [x] 2.2 Handle `BrowserResponse` fixtures and skip JSON bodies
+- [x] 2.2 Handle `BrowserResponse` fixtures, skip JSON and XML (sitemap) bodies, strip XML declarations from XHTML
 - [x] 2.3 Require copying the helper in the creation flow and `fixture-testing`
 - [x] 2.4 Restrict clean HTML to reading; selectors target the raw response body
