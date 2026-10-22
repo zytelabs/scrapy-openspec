@@ -14,7 +14,7 @@ API key comes from or what to do when it is missing.
 
 - Shopify detection is a `scrapy savefixture` of the stub listing page object; Ecwid detection reads the raw fixture HTML
 - `fixture-testing` refers to creation-flow step 7 and uses the `base` project name
-- `scripts/clean_fixture.py` ships with the spec, is copied into new projects, and handles `BrowserResponse` fixtures and JSON bodies
+- `scripts/clean_fixture.py` ships with the spec, is copied into new projects, and handles `BrowserResponse` fixtures, JSON bodies and XML sitemaps
 - Selectors are developed against the raw `<Response>-body.html`; the clean HTML is for reading only
 - New requirement: the Zyte API key comes from `ZYTE_API_KEY`, and a missing key means asking the developer, not working around it
 
