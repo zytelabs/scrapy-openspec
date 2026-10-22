@@ -65,8 +65,19 @@ object instead of the HTML collection page. The listing page object then parses
 JSON via `json.loads(self.response.body)` rather than CSS/XPath selectors.
 
 #### Platform: Shopify
-**Detection**: request `{domain}/products.json?limit=1`. A 200 response with a
-`{"products": [...]}` body confirms Shopify.
+**Detection**: probe through the Scrapy project, never with a direct request
+(see `fixture-testing`). Create the stub listing page object with
+`@handle_urls("{domain}/products.json")` and save its fixture:
+
+```bash
+scrapy savefixture <projectname>.pages.<domain_file>.<Prefix>ProductListPage "https://{domain}/products.json?limit=250"
+```
+
+If the saved `inputs/HttpResponse-body.html` is JSON with a `"products"` array,
+the store is Shopify and that fixture is the listing page object's fixture. If
+`savefixture` fails or the body is anything else, the site is not Shopify:
+delete that fixture directory, change `handle_urls` to the HTML listing pattern,
+and continue with the HTML approach.
 
 **Start URL**: `{domain}/products.json?limit=250`
 
@@ -103,8 +114,10 @@ class ExampleProductListPage(WebPage, Returns[ProductList]):
 ```
 
 #### Platform: Ecwid
-**Detection**: look for `ecwidStoreID` in the page HTML. The store ID and public
-token (`public_…`) are embedded in the page's JavaScript configuration.
+**Detection**: look for `ecwidStoreID` in the HTML listing page's fixture. The
+store ID and public token (`public_…`) are embedded in the page's JavaScript
+configuration, so search the raw `inputs/HttpResponse-body.html`, not the
+`-clean.html` or `.txt` files: clear-html strips the `<script>` tags that hold it.
 
 **Store ID**: extract from `ecwidStoreID = "..."` or from CDN image URLs
 (`d2j6dbq0eux0bg.cloudfront.net/images/{storeId}/...`).
@@ -117,6 +130,9 @@ if no general token exists.
 element, e.g. `ecwid-productBrowser-CategoryPage-{categoryId}`.
 
 **Start URL**: `https://app.ecwid.com/api/v3/{storeId}/products?categoryId={categoryId}&enabled=true&limit=100&token={publicToken}`
+
+Once the start URL is known, save the listing page object's fixture against it
+with `scrapy savefixture`, like any other page.
 
 **Pagination**: offset-based — if `offset + count < total`, increment `offset`
 by `limit` and request the same URL with the new `offset`.
@@ -155,6 +171,10 @@ class ExampleProductListPage(WebPage, Returns[ProductList]):
 #### Scenario: Ecwid site uses the REST API instead of the storefront HTML
 - **WHEN** a new domain embeds `ecwidStoreID` in its HTML
 - **THEN** the store ID, category ID, and public token are extracted from the HTML and the spider start URL is the Ecwid REST API endpoint
+
+#### Scenario: Platform detection goes through savefixture
+- **WHEN** a site is probed for a Shopify `products.json` endpoint
+- **THEN** the probe is a `scrapy savefixture` of the stub listing page object, and no HTTP library, fetch tool, or other direct request is used
 
 #### Scenario: Unknown platform falls back to HTML scraping
 - **WHEN** no known platform API is detected
@@ -220,6 +240,27 @@ fully custom and do not inherit from `zyte_common_items`.
 - **WHEN** the project enables `scrapy_zyte_api.Addon`
 - **THEN** its dependency is declared as `scrapy-zyte-api[provider]` and the addon can load `ZyteApiProvider` without an import error
 
+### Requirement: Zyte API key comes from the environment
+The Zyte API key SHALL be provided through the `ZYTE_API_KEY` environment
+variable, which `scrapy-zyte-api` reads automatically. The key SHALL NOT be
+written to `settings.py`, `pyproject.toml`, or any other file in the project.
+
+`scrapy savefixture` and `scrapy crawl` cannot fetch pages without the key. If
+it is missing, the developer SHALL be asked to set it. The missing key SHALL NOT
+be worked around by removing `scrapy_zyte_api.Addon`, falling back to Scrapy's
+default downloader, or fetching pages any other way.
+
+Projects that render with `scrapy-playwright` instead of Zyte API (see the
+`scrapy-playwright` spec) do not need the key.
+
+#### Scenario: Key is not stored in the project
+- **WHEN** the project files are inspected
+- **THEN** no file contains a Zyte API key and `ZYTE_API_KEY` is not assigned in `settings.py`
+
+#### Scenario: Key is missing when saving a fixture
+- **WHEN** `scrapy savefixture` fails because `ZYTE_API_KEY` is not set
+- **THEN** the developer is asked to set it, and no workaround is attempted
+
 ### Requirement: Project source files live inside the project folder
 After running `scrapy startproject <name> .`, all source files SHALL be placed
 inside the `<projectname>/` directory that Scrapy creates. This includes
@@ -271,12 +312,12 @@ unless the user explicitly specifies a different name.
 A Scrapy project using this stack MUST be created in the following order.
 No step SHALL be attempted before all preceding steps are complete:
 
-1. `scrapy startproject <name> .` — create the Scrapy project
-2. Update `<projectname>/settings.py` — configure addons, discovery, pipeline
+1. `scrapy startproject <name> .` — create the Scrapy project, then copy `openspec/scripts/clean_fixture.py` to `scripts/clean_fixture.py`
+2. Update `<projectname>/settings.py` — configure addons and discovery (plus the SQLite pipeline only if the user asked for it)
 3. Create `<projectname>/items.py` — define `Product` and `ProductList` dataclasses
 4. `scrapy genspider` — generate the spider scaffold in `<projectname>/spiders/`, then rename class and file
 5. Create page objects with `pass` stubs in `<projectname>/pages/` — one file per domain, classes importable
-6. `scrapy savefixture` — save fixture for each page object, then run `clean_fixture.py`
+6. `scrapy savefixture` — save fixture for each page object, then run `python scripts/clean_fixture.py <fixture dir>`
 7. **Subagent(s)**: populate `output.json` and implement selectors — one subagent per page object, run in parallel where possible
 8. Update spider — add `urls`, `allowed_domains`, and wire callbacks
 
